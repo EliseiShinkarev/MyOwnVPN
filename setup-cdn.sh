@@ -106,7 +106,7 @@ fi
 
 # ── 8. Генерация CDN-ссылки и QR ─────────────
 
-CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=/${WS_PATH}&fp=chrome#MyVPN-CDN"
+CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=%2F${WS_PATH}&fp=chrome#MyVPN-CDN"
 
 echo ""
 echo -e "${CYAN}══════════════════════════════════════${NC}"
