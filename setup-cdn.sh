@@ -67,7 +67,7 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
     -out "${CERT_DIR}/cdn-cert.pem" \
     -days 3650 -nodes -subj "/CN=${CDN_DOMAIN}" 2>/dev/null
 
-chmod 600 "${CERT_DIR}/cdn-key.pem"
+chmod 644 "${CERT_DIR}/cdn-key.pem"
 info "Сертификат создан: ${CERT_DIR}/cdn-cert.pem"
 
 # ── 5. Добавляем gRPC inbound в конфиг ────────

@@ -124,7 +124,7 @@ if [[ "$CDN_ENABLED" == true ]]; then
         -keyout "${CERT_DIR}/cdn-key.pem" \
         -out "${CERT_DIR}/cdn-cert.pem" \
         -days 3650 -nodes -subj "/CN=${CDN_DOMAIN}" 2>/dev/null
-    chmod 600 "${CERT_DIR}/cdn-key.pem"
+    chmod 644 "${CERT_DIR}/cdn-key.pem"
     info "Сертификат создан: ${CERT_DIR}/cdn-cert.pem"
 fi
 
