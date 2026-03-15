@@ -116,6 +116,18 @@ else
     TEMPLATE="$SCRIPT_DIR/configs/server-template.json"
 fi
 
+# Генерация самоподписанного сертификата для CDN gRPC
+if [[ "$CDN_ENABLED" == true ]]; then
+    info "Генерация самоподписанного TLS-сертификата для gRPC..."
+    CERT_DIR="/usr/local/etc/xray"
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+        -keyout "${CERT_DIR}/cdn-key.pem" \
+        -out "${CERT_DIR}/cdn-cert.pem" \
+        -days 3650 -nodes -subj "/CN=${CDN_DOMAIN}" 2>/dev/null
+    chmod 600 "${CERT_DIR}/cdn-key.pem"
+    info "Сертификат создан: ${CERT_DIR}/cdn-cert.pem"
+fi
+
 if [[ -f "$TEMPLATE" ]]; then
     sed -e "s|__UUID__|${CLIENT_UUID}|g" \
         -e "s|__PRIVATE_KEY__|${PRIVATE_KEY}|g" \
@@ -166,11 +178,11 @@ if command -v ufw &>/dev/null; then
     ufw allow 22/tcp > /dev/null 2>&1
     ufw allow 443/tcp > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
-        ufw allow 80/tcp > /dev/null 2>&1
+        ufw allow 2053/tcp > /dev/null 2>&1
     fi
     ufw --force enable > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
-        info "UFW: открыты порты 22 (SSH), 443 (VLESS) и 80 (CDN)"
+        info "UFW: открыты порты 22 (SSH), 443 (VLESS) и 2053 (CDN gRPC)"
     else
         info "UFW: открыты порты 22 (SSH) и 443 (VLESS)"
     fi
@@ -208,7 +220,7 @@ fi
 VLESS_LINK="vless://${CLIENT_UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI_HOST}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp#MyVPN"
 
 if [[ "$CDN_ENABLED" == true ]]; then
-    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=%2F&fp=chrome#MyVPN-CDN"
+    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:2053?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=grpc&serviceName=cdn&fp=chrome#MyVPN-CDN"
 fi
 
 echo ""
@@ -269,7 +281,7 @@ if [[ "$CDN_ENABLED" == true ]]; then
 
 ── CDN-режим (Cloudflare) ──
 Домен:        ${CDN_DOMAIN}
-Порт CDN:     80 (origin) → 443 (Cloudflare)
+Порт CDN:     2053 (origin, gRPC+TLS) → 2053 (Cloudflare)
 
 CDN-ссылка:
 ${CDN_LINK}
@@ -290,8 +302,9 @@ if [[ "$CDN_ENABLED" == true ]]; then
     echo -e "${YELLOW}Настройте Cloudflare:${NC}"
     echo -e "  4. Домен ${CDN_DOMAIN} должен быть добавлен в Cloudflare"
     echo -e "  5. DNS → A-запись: ${CDN_DOMAIN} → ${SERVER_IP}, Proxy ON (оранжевое облако)"
-    echo -e "  6. SSL/TLS → режим ${CYAN}Flexible${NC}"
-    echo -e "  7. Подробнее: docs/CLOUDFLARE_GUIDE.md"
+    echo -e "  6. SSL/TLS → режим ${CYAN}Full${NC} (НЕ Flexible!)"
+    echo -e "  7. Network → ${CYAN}gRPC: ON${NC}"
+    echo -e "  8. Подробнее: docs/CLOUDFLARE_GUIDE.md"
     echo ""
     echo -e "${YELLOW}Когда какую ссылку использовать:${NC}"
     echo -e "  • ${CYAN}MyVPN (Reality)${NC} — по умолчанию, быстрее"

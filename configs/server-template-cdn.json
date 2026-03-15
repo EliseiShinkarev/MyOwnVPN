@@ -44,9 +44,9 @@
     },
     {
       "listen": "0.0.0.0",
-      "port": 80,
+      "port": 2053,
       "protocol": "vless",
-      "tag": "vless-ws-cdn",
+      "tag": "vless-grpc-cdn",
       "settings": {
         "clients": [
           {
@@ -56,9 +56,18 @@
         "decryption": "none"
       },
       "streamSettings": {
-        "network": "ws",
-        "wsSettings": {
-          "path": "/"
+        "network": "grpc",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/usr/local/etc/xray/cdn-cert.pem",
+              "keyFile": "/usr/local/etc/xray/cdn-key.pem"
+            }
+          ]
+        },
+        "grpcSettings": {
+          "serviceName": "cdn"
         }
       },
       "sniffing": {

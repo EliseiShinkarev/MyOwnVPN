@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─────────────────────────────────────────────
-# MyOwnVPN — добавление CDN-режима (VLESS + WebSocket)
+# MyOwnVPN — добавление CDN-режима (VLESS + gRPC)
 # Запускать от root на сервере с уже установленным MyOwnVPN
 # ─────────────────────────────────────────────
 
@@ -14,7 +14,8 @@ NC='\033[0m'
 
 XRAY_CONFIG="/usr/local/etc/xray/config.json"
 CREDENTIALS_FILE="/root/vpn-credentials.txt"
-CDN_PORT=80
+CDN_PORT=2053
+CERT_DIR="/usr/local/etc/xray"
 
 info()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
@@ -23,7 +24,7 @@ error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 # ── 1. Проверки ──────────────────────────────
 
 echo -e "\n${CYAN}══════════════════════════════════════${NC}"
-echo -e "${CYAN}   MyOwnVPN — CDN Mode Setup${NC}"
+echo -e "${CYAN}   MyOwnVPN — CDN Mode Setup (gRPC)${NC}"
 echo -e "${CYAN}══════════════════════════════════════${NC}\n"
 
 [[ $EUID -ne 0 ]] && error "Запустите скрипт от root: sudo bash setup-cdn.sh"
@@ -33,9 +34,15 @@ command -v xray &>/dev/null || error "XRay не установлен. Снача
 command -v jq &>/dev/null || { info "Устанавливаю jq..."; apt-get install -y -qq jq > /dev/null 2>&1; }
 command -v qrencode &>/dev/null || { info "Устанавливаю qrencode..."; apt-get install -y -qq qrencode > /dev/null 2>&1; }
 
-# Проверяем что WS inbound ещё не добавлен
-if jq -e '.inbounds[] | select(.tag == "vless-ws-cdn")' "$XRAY_CONFIG" > /dev/null 2>&1; then
+# Проверяем что gRPC inbound ещё не добавлен
+if jq -e '.inbounds[] | select(.tag == "vless-grpc-cdn")' "$XRAY_CONFIG" > /dev/null 2>&1; then
     error "CDN inbound уже существует в конфиге. Удалите его вручную, если хотите переустановить."
+fi
+
+# Также проверяем старый WS inbound
+if jq -e '.inbounds[] | select(.tag == "vless-ws-cdn")' "$XRAY_CONFIG" > /dev/null 2>&1; then
+    warn "Обнаружен старый WS CDN inbound. Удалите его вручную перед добавлением gRPC."
+    error "Старый CDN inbound (vless-ws-cdn) найден в конфиге."
 fi
 
 # ── 2. Читаем UUID из конфига ─────────────────
@@ -51,30 +58,51 @@ read -rp "$(echo -e "${CYAN}Введите домен (привязанный к
 [[ -z "$CDN_DOMAIN" ]] && error "Домен не может быть пустым"
 info "Домен: ${CDN_DOMAIN}"
 
-# ── 4. Добавляем WS inbound в конфиг ──────────
+# ── 4. Генерация самоподписанного сертификата ─
 
-info "Добавляю CDN inbound в конфиг XRay..."
+info "Генерация самоподписанного TLS-сертификата для gRPC..."
 
-WS_INBOUND=$(cat <<WEOF
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+    -keyout "${CERT_DIR}/cdn-key.pem" \
+    -out "${CERT_DIR}/cdn-cert.pem" \
+    -days 3650 -nodes -subj "/CN=${CDN_DOMAIN}" 2>/dev/null
+
+chmod 600 "${CERT_DIR}/cdn-key.pem"
+info "Сертификат создан: ${CERT_DIR}/cdn-cert.pem"
+
+# ── 5. Добавляем gRPC inbound в конфиг ────────
+
+info "Добавляю CDN inbound (gRPC) в конфиг XRay..."
+
+GRPC_INBOUND=$(cat <<GEOF
 {
   "listen": "0.0.0.0",
   "port": ${CDN_PORT},
   "protocol": "vless",
-  "tag": "vless-ws-cdn",
+  "tag": "vless-grpc-cdn",
   "settings": {
     "clients": [{"id": "${CLIENT_UUID}"}],
     "decryption": "none"
   },
   "streamSettings": {
-    "network": "ws",
-    "wsSettings": {"path": "/"}
+    "network": "grpc",
+    "security": "tls",
+    "tlsSettings": {
+      "certificates": [{
+        "certificateFile": "${CERT_DIR}/cdn-cert.pem",
+        "keyFile": "${CERT_DIR}/cdn-key.pem"
+      }]
+    },
+    "grpcSettings": {
+      "serviceName": "cdn"
+    }
   },
   "sniffing": {"enabled": true, "destOverride": ["http", "tls", "quic"]}
 }
-WEOF
+GEOF
 )
 
-jq --argjson inbound "$WS_INBOUND" '.inbounds += [$inbound]' "$XRAY_CONFIG" > "${XRAY_CONFIG}.tmp"
+jq --argjson inbound "$GRPC_INBOUND" '.inbounds += [$inbound]' "$XRAY_CONFIG" > "${XRAY_CONFIG}.tmp"
 mv "${XRAY_CONFIG}.tmp" "$XRAY_CONFIG"
 info "Конфиг обновлён"
 
@@ -101,11 +129,11 @@ fi
 
 # ── 8. Генерация CDN-ссылки и QR ─────────────
 
-CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=%2F&fp=chrome#MyVPN-CDN"
+CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:2053?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=grpc&serviceName=cdn&fp=chrome#MyVPN-CDN"
 
 echo ""
 echo -e "${CYAN}══════════════════════════════════════${NC}"
-echo -e "${CYAN}   CDN-режим добавлен!${NC}"
+echo -e "${CYAN}   CDN-режим добавлен! (gRPC)${NC}"
 echo -e "${CYAN}══════════════════════════════════════${NC}"
 echo ""
 echo -e "${GREEN}CDN-ссылка для подключения:${NC}"
@@ -123,9 +151,9 @@ echo ""
 if [[ -f "$CREDENTIALS_FILE" ]]; then
     cat >> "$CREDENTIALS_FILE" <<CEOF
 
-── CDN-режим (Cloudflare) ──
+── CDN-режим (Cloudflare gRPC) ──
 Домен:        ${CDN_DOMAIN}
-Порт CDN:     ${CDN_PORT} (origin) → 443 (Cloudflare)
+Порт CDN:     ${CDN_PORT} (origin, gRPC+TLS) → 2053 (Cloudflare)
 
 CDN-ссылка:
 ${CDN_LINK}
@@ -138,8 +166,9 @@ fi
 echo -e "${YELLOW}Настройте Cloudflare:${NC}"
 echo -e "  1. Домен ${CDN_DOMAIN} должен быть добавлен в Cloudflare"
 echo -e "  2. DNS → A-запись: ${CDN_DOMAIN} → IP сервера, Proxy ON (оранжевое облако)"
-echo -e "  3. SSL/TLS → режим ${CYAN}Flexible${NC}"
-echo -e "  4. Подробнее: docs/CLOUDFLARE_GUIDE.md"
+echo -e "  3. SSL/TLS → режим ${CYAN}Full${NC} (НЕ Flexible!)"
+echo -e "  4. Network → ${CYAN}gRPC: ON${NC}"
+echo -e "  5. Подробнее: docs/CLOUDFLARE_GUIDE.md"
 echo ""
 echo -e "${YELLOW}Когда использовать:${NC}"
 echo -e "  • ${CYAN}Reality-ссылка (MyVPN)${NC} — по умолчанию, быстрее"
