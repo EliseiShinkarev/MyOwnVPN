@@ -51,12 +51,7 @@ read -rp "$(echo -e "${CYAN}Введите домен (привязанный к
 [[ -z "$CDN_DOMAIN" ]] && error "Домен не может быть пустым"
 info "Домен: ${CDN_DOMAIN}"
 
-# ── 4. Генерация WS path ────────────────────
-
-WS_PATH=$(openssl rand -hex 4)
-info "WS path: /${WS_PATH}"
-
-# ── 5. Добавляем WS inbound в конфиг ─────────
+# ── 4. Добавляем WS inbound в конфиг ──────────
 
 info "Добавляю CDN inbound в конфиг XRay..."
 
@@ -72,7 +67,7 @@ WS_INBOUND=$(cat <<WEOF
   },
   "streamSettings": {
     "network": "ws",
-    "wsSettings": {"path": "/${WS_PATH}"}
+    "wsSettings": {"path": "/"}
   },
   "sniffing": {"enabled": true, "destOverride": ["http", "tls", "quic"]}
 }
@@ -106,7 +101,7 @@ fi
 
 # ── 8. Генерация CDN-ссылки и QR ─────────────
 
-CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=%2F${WS_PATH}&fp=chrome#MyVPN-CDN"
+CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=%2F&fp=chrome#MyVPN-CDN"
 
 echo ""
 echo -e "${CYAN}══════════════════════════════════════${NC}"
@@ -130,7 +125,6 @@ if [[ -f "$CREDENTIALS_FILE" ]]; then
 
 ── CDN-режим (Cloudflare) ──
 Домен:        ${CDN_DOMAIN}
-WS Path:      /${WS_PATH}
 Порт CDN:     ${CDN_PORT} (origin) → 443 (Cloudflare)
 
 CDN-ссылка:

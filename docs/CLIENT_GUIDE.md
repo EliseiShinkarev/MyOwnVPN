@@ -9,7 +9,7 @@ vless://UUID@IP:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=w
 
 **CDN (если включён CDN-режим):**
 ```
-vless://UUID@домен:443?encryption=none&security=tls&sni=домен&type=ws&host=домен&path=%2F...&fp=chrome#MyVPN-CDN
+vless://UUID@домен:443?encryption=none&security=tls&sni=домен&type=ws&host=домен&path=%2F&fp=chrome#MyVPN-CDN
 ```
 
 ## iPhone

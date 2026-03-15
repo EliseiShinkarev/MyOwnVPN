@@ -47,15 +47,13 @@ MODE_CHOICE="${MODE_CHOICE:-1}"
 
 CDN_ENABLED=false
 CDN_DOMAIN=""
-WS_PATH=""
 
 if [[ "$MODE_CHOICE" == "2" ]]; then
     CDN_ENABLED=true
     echo ""
     read -rp "$(echo -e "${CYAN}Введите домен (привязанный к Cloudflare): ${NC}")" CDN_DOMAIN
     [[ -z "$CDN_DOMAIN" ]] && error "Домен не может быть пустым"
-    WS_PATH=$(openssl rand -hex 4)
-    info "CDN-режим: домен ${CDN_DOMAIN}, WS path /${WS_PATH}"
+    info "CDN-режим: домен ${CDN_DOMAIN}"
 fi
 
 # ── 2. Обновление и зависимости ──────────────
@@ -123,7 +121,6 @@ if [[ -f "$TEMPLATE" ]]; then
         -e "s|__PRIVATE_KEY__|${PRIVATE_KEY}|g" \
         -e "s|__SNI_HOST__|${SNI_HOST}|g" \
         -e "s|__SHORT_ID__|${SHORT_ID}|g" \
-        -e "s|__WS_PATH__|${WS_PATH}|g" \
         "$TEMPLATE" > "$XRAY_CONFIG"
 else
     warn "Шаблон не найден, создаю конфиг напрямую..."
@@ -211,7 +208,7 @@ fi
 VLESS_LINK="vless://${CLIENT_UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI_HOST}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp#MyVPN"
 
 if [[ "$CDN_ENABLED" == true ]]; then
-    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=%2F${WS_PATH}&fp=chrome#MyVPN-CDN"
+    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=%2F&fp=chrome#MyVPN-CDN"
 fi
 
 echo ""
@@ -272,7 +269,6 @@ if [[ "$CDN_ENABLED" == true ]]; then
 
 ── CDN-режим (Cloudflare) ──
 Домен:        ${CDN_DOMAIN}
-WS Path:      /${WS_PATH}
 Порт CDN:     80 (origin) → 443 (Cloudflare)
 
 CDN-ссылка:
