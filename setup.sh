@@ -211,7 +211,7 @@ fi
 VLESS_LINK="vless://${CLIENT_UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI_HOST}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp#MyVPN"
 
 if [[ "$CDN_ENABLED" == true ]]; then
-    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=httpupgrade&host=${CDN_DOMAIN}&path=/${WS_PATH}&fp=chrome#MyVPN-CDN"
+    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=xhttp&host=${CDN_DOMAIN}&path=/${WS_PATH}&fp=chrome#MyVPN-CDN"
 fi
 
 echo ""

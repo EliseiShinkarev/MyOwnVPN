@@ -56,9 +56,10 @@
         "decryption": "none"
       },
       "streamSettings": {
-        "network": "httpupgrade",
-        "httpupgradeSettings": {
-          "path": "/__WS_PATH__"
+        "network": "xhttp",
+        "xhttpSettings": {
+          "path": "/__WS_PATH__",
+          "mode": "auto"
         }
       },
       "sniffing": {
