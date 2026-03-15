@@ -50,10 +50,10 @@ chmod +x setup.sh
 ## Что под капотом
 
 - **Протокол**: VLESS + XTLS-Vision + Reality
-- **CDN-режим**: VLESS + WebSocket через Cloudflare (порт 2082)
+- **CDN-режим**: VLESS + XHTTP через Cloudflare (порт 80)
 - **Маскировка**: TLS 1.3, SNI `www.microsoft.com`, uTLS fingerprint `chrome`
-- **Порт**: 443 (стандартный HTTPS) + 2082 (CDN, если включён)
-- **Файрвол**: только 22 (SSH) + 443 (VLESS) + 2082 (CDN, опционально)
+- **Порт**: 443 (стандартный HTTPS) + 80 (CDN, если включён)
+- **Файрвол**: только 22 (SSH) + 443 (VLESS) + 80 (CDN, опционально)
 
 ## Файлы
 

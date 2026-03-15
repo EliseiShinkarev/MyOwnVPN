@@ -14,7 +14,7 @@ NC='\033[0m'
 
 XRAY_CONFIG="/usr/local/etc/xray/config.json"
 CREDENTIALS_FILE="/root/vpn-credentials.txt"
-CDN_PORT=2082
+CDN_PORT=80
 
 info()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }

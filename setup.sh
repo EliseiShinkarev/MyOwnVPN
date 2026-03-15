@@ -169,11 +169,11 @@ if command -v ufw &>/dev/null; then
     ufw allow 22/tcp > /dev/null 2>&1
     ufw allow 443/tcp > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
-        ufw allow 2082/tcp > /dev/null 2>&1
+        ufw allow 80/tcp > /dev/null 2>&1
     fi
     ufw --force enable > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
-        info "UFW: открыты порты 22 (SSH), 443 (VLESS) и 2082 (CDN)"
+        info "UFW: открыты порты 22 (SSH), 443 (VLESS) и 80 (CDN)"
     else
         info "UFW: открыты порты 22 (SSH) и 443 (VLESS)"
     fi
@@ -273,7 +273,7 @@ if [[ "$CDN_ENABLED" == true ]]; then
 ── CDN-режим (Cloudflare) ──
 Домен:        ${CDN_DOMAIN}
 WS Path:      /${WS_PATH}
-Порт CDN:     2082 (origin) → 443 (Cloudflare)
+Порт CDN:     80 (origin) → 443 (Cloudflare)
 
 CDN-ссылка:
 ${CDN_LINK}

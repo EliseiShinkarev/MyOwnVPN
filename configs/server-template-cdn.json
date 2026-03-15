@@ -44,7 +44,7 @@
     },
     {
       "listen": "0.0.0.0",
-      "port": 2082,
+      "port": 80,
       "protocol": "vless",
       "tag": "vless-ws-cdn",
       "settings": {
