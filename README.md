@@ -19,7 +19,7 @@ apt install -y git
 git clone https://github.com/YOUR_USER/MyOwnVPN.git
 cd MyOwnVPN
 chmod +x setup.sh
-./setup.sh
+
 ```
 
 Скрипт за ~2 минуты:

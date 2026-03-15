@@ -62,8 +62,10 @@ fi
 
 info "Обновление системы и установка зависимостей..."
 export DEBIAN_FRONTEND=noninteractive
+apt-mark hold openssh-server > /dev/null 2>&1
 apt-get update -qq
 apt-get upgrade -y -qq
+apt-mark unhold openssh-server > /dev/null 2>&1
 apt-get install -y -qq curl openssl jq qrencode > /dev/null 2>&1
 info "Зависимости установлены"
 
@@ -164,9 +166,6 @@ info "Конфиг записан в ${XRAY_CONFIG}"
 
 info "Настраиваю файрвол..."
 if command -v ufw &>/dev/null; then
-    ufw --force reset > /dev/null 2>&1
-    ufw default deny incoming > /dev/null 2>&1
-    ufw default allow outgoing > /dev/null 2>&1
     ufw allow 22/tcp > /dev/null 2>&1
     ufw allow 443/tcp > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
