@@ -56,10 +56,9 @@
         "decryption": "none"
       },
       "streamSettings": {
-        "network": "xhttp",
-        "xhttpSettings": {
-          "path": "/__WS_PATH__",
-          "mode": "auto"
+        "network": "ws",
+        "wsSettings": {
+          "path": "/__WS_PATH__"
         }
       },
       "sniffing": {

@@ -71,8 +71,8 @@ WS_INBOUND=$(cat <<WEOF
     "decryption": "none"
   },
   "streamSettings": {
-    "network": "xhttp",
-    "xhttpSettings": {"path": "/${WS_PATH}", "mode": "auto"}
+    "network": "ws",
+    "wsSettings": {"path": "/${WS_PATH}"}
   },
   "sniffing": {"enabled": true, "destOverride": ["http", "tls", "quic"]}
 }
@@ -106,7 +106,7 @@ fi
 
 # ── 8. Генерация CDN-ссылки и QR ─────────────
 
-CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=xhttp&host=${CDN_DOMAIN}&path=/${WS_PATH}&fp=chrome#MyVPN-CDN"
+CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=ws&host=${CDN_DOMAIN}&path=/${WS_PATH}&fp=chrome#MyVPN-CDN"
 
 echo ""
 echo -e "${CYAN}══════════════════════════════════════${NC}"
