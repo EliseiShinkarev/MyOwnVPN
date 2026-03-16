@@ -129,6 +129,7 @@ stream {
     }
     server {
         listen 443;
+        listen [::]:443;
         proxy_pass \$backend;
         ssl_preread on;
         proxy_connect_timeout 5s;
