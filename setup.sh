@@ -178,6 +178,11 @@ info "Конфиг записан в ${XRAY_CONFIG}"
 
 info "Настраиваю файрвол..."
 if command -v ufw &>/dev/null; then
+    # Ensure IPv6 support is enabled so rules apply to both v4 and v6
+    if grep -q 'IPV6=no' /etc/default/ufw 2>/dev/null; then
+        sed -i 's/IPV6=no/IPV6=yes/' /etc/default/ufw
+        ufw disable > /dev/null 2>&1 || true
+    fi
     ufw allow 22/tcp > /dev/null 2>&1
     ufw allow 443/tcp > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
