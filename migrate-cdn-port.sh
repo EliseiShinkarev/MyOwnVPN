@@ -143,42 +143,42 @@ info "nginx SNI-роутер настроен (${CDN_DOMAIN} → :${CDN_PORT}, *
 # ── 7. Файрвол ───────────────────────────────
 
 if command -v ufw &>/dev/null; then
+    ufw allow 22/tcp    > /dev/null 2>&1
     ufw allow 443/tcp   > /dev/null 2>&1
     ufw deny ${CDN_PORT}/tcp  > /dev/null 2>&1
     ufw deny ${REALITY_PORT}/tcp > /dev/null 2>&1
-    info "UFW: 443 открыт; ${CDN_PORT} и ${REALITY_PORT} закрыты снаружи"
+    info "UFW: 22 и 443 открыты; ${CDN_PORT} и ${REALITY_PORT} закрыты снаружи"
 else
     warn "UFW не найден — вручную проверьте что 443 открыт, а ${CDN_PORT} и ${REALITY_PORT} закрыты"
 fi
 
 # ── 8. Перезапуск XRay, затем nginx ──────────
+# Запускаем рестарт в фоне — systemctl restart xray может оборвать SSH-сессию
+# (XRay участвует в routing), поэтому скрипт должен завершиться до рестарта.
 
-info "Перезапускаю XRay (освобождает порт 443)..."
-systemctl restart xray
-sleep 2
-
-if systemctl is-active --quiet xray; then
-    info "XRay запущен"
-else
-    error "XRay не запустился. Проверьте: journalctl -u xray -n 30"
-fi
-
-info "Запускаю nginx (занимает порт 443)..."
 systemctl enable nginx > /dev/null 2>&1
-systemctl restart nginx
-sleep 1
 
-if systemctl is-active --quiet nginx; then
-    info "nginx запущен"
-else
-    error "nginx не запустился. Проверьте: journalctl -u nginx -n 30"
-fi
+cat > /tmp/vpn_restart.sh <<'RESTART_EOF'
+#!/bin/bash
+sleep 2
+systemctl restart xray
+sleep 3
+systemctl restart nginx
+echo "$(date '+%H:%M:%S') xray=$(systemctl is-active xray) nginx=$(systemctl is-active nginx)" \
+    >> /tmp/vpn_restart.log
+RESTART_EOF
+chmod +x /tmp/vpn_restart.sh
+nohup bash /tmp/vpn_restart.sh > /tmp/vpn_restart.log 2>&1 &
+
+info "Рестарт XRay и nginx запущен в фоне (через ~2 сек)"
+info "Проверьте через 10 сек: systemctl status xray nginx"
+info "Лог рестарта: cat /tmp/vpn_restart.log"
 
 # ── 9. Итог ──────────────────────────────────
 
 echo ""
 echo -e "${CYAN}══════════════════════════════════════════════════${NC}"
-echo -e "${CYAN}   Миграция завершена успешно!${NC}"
+echo -e "${CYAN}   Настройка завершена. Сервисы перезапускаются в фоне (~5 сек).${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${GREEN}Текущая схема:${NC}"
@@ -186,7 +186,8 @@ echo -e "  Internet → ${CYAN}ВАШ_IP:443${NC} (nginx SNI-роутер)"
 echo -e "    SNI = ${CDN_DOMAIN}  →  127.0.0.1:${CDN_PORT}  (XRay gRPC CDN)"
 echo -e "    SNI = *              →  127.0.0.1:${REALITY_PORT} (XRay Reality)"
 echo ""
-echo -e "${YELLOW}Верификация (на сервере):${NC}"
+echo -e "${YELLOW}Верификация (подождите ~10 сек после завершения скрипта):${NC}"
+echo -e "  cat /tmp/vpn_restart.log          # лог рестарта"
 echo -e "  ss -tlnp | grep -E ':443|:2053|:9443'"
 echo -e "  # Ожидание:"
 echo -e "  #   127.0.0.1:9443   xray"

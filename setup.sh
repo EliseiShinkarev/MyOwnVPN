@@ -241,28 +241,41 @@ fi
 
 # ── 10. Запуск XRay ──────────────────────────
 
-info "Запускаю XRay..."
 systemctl daemon-reload
 systemctl enable xray > /dev/null 2>&1
-systemctl restart xray
-
-sleep 2
-if systemctl is-active --quiet xray; then
-    info "XRay запущен и работает"
-else
-    error "XRay не запустился. Проверьте: journalctl -u xray -n 20"
-fi
 
 if [[ "$CDN_ENABLED" == true ]]; then
-    info "Запускаю nginx..."
-    systemctl enable nginx > /dev/null 2>&1
-    systemctl restart nginx
-    sleep 1
-    if systemctl is-active --quiet nginx; then
-        info "nginx запущен и работает"
-    else
-        error "nginx не запустился. Проверьте: journalctl -u nginx -n 20"
-    fi
+    systemctl enable nginx > /dev/null 2>&1 || true
+
+    cat > /tmp/vpn_restart.sh <<'RESTART_EOF'
+#!/bin/bash
+sleep 2
+systemctl restart xray
+sleep 3
+systemctl restart nginx
+echo "$(date '+%H:%M:%S') xray=$(systemctl is-active xray) nginx=$(systemctl is-active nginx)" \
+    >> /tmp/vpn_restart.log
+RESTART_EOF
+    chmod +x /tmp/vpn_restart.sh
+    nohup bash /tmp/vpn_restart.sh > /tmp/vpn_restart.log 2>&1 &
+
+    info "Сервисы перезапускаются в фоне (через ~2 сек)"
+    info "Проверьте через 10 сек: systemctl status xray nginx"
+    info "Лог: cat /tmp/vpn_restart.log"
+else
+    cat > /tmp/vpn_restart.sh <<'RESTART_EOF'
+#!/bin/bash
+sleep 2
+systemctl restart xray
+echo "$(date '+%H:%M:%S') xray=$(systemctl is-active xray)" \
+    >> /tmp/vpn_restart.log
+RESTART_EOF
+    chmod +x /tmp/vpn_restart.sh
+    nohup bash /tmp/vpn_restart.sh > /tmp/vpn_restart.log 2>&1 &
+
+    info "XRay перезапускается в фоне (через ~2 сек)"
+    info "Проверьте через 10 сек: systemctl status xray"
+    info "Лог: cat /tmp/vpn_restart.log"
 fi
 
 # ── 10. Генерация ссылки и QR ─────────────────
