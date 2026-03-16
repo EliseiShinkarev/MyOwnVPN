@@ -4,8 +4,8 @@
   },
   "inbounds": [
     {
-      "listen": "0.0.0.0",
-      "port": 443,
+      "listen": "127.0.0.1",
+      "port": 9443,
       "protocol": "vless",
       "tag": "vless-reality",
       "settings": {
@@ -43,7 +43,7 @@
       }
     },
     {
-      "listen": "0.0.0.0",
+      "listen": "127.0.0.1",
       "port": 2053,
       "protocol": "vless",
       "tag": "vless-grpc-cdn",

@@ -64,7 +64,10 @@ apt-mark hold openssh-server > /dev/null 2>&1
 apt-get update -qq
 apt-get upgrade -y -qq
 apt-mark unhold openssh-server > /dev/null 2>&1
-apt-get install -y -qq curl openssl jq qrencode > /dev/null 2>&1
+EXTRA_PKGS="curl openssl jq qrencode"
+[[ "$CDN_ENABLED" == true ]] && EXTRA_PKGS="$EXTRA_PKGS nginx libnginx-mod-stream"
+# shellcheck disable=SC2086
+apt-get install -y -qq $EXTRA_PKGS > /dev/null 2>&1
 info "Зависимости установлены"
 
 # ── 3. Установка XRay ────────────────────────
@@ -178,11 +181,12 @@ if command -v ufw &>/dev/null; then
     ufw allow 22/tcp > /dev/null 2>&1
     ufw allow 443/tcp > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
-        ufw allow 2053/tcp > /dev/null 2>&1
+        ufw deny 2053/tcp > /dev/null 2>&1
+        ufw deny 9443/tcp > /dev/null 2>&1
     fi
     ufw --force enable > /dev/null 2>&1
     if [[ "$CDN_ENABLED" == true ]]; then
-        info "UFW: открыты порты 22 (SSH), 443 (VLESS) и 2053 (CDN gRPC)"
+        info "UFW: открыты порты 22 (SSH), 443 (nginx/VLESS); 2053 и 9443 закрыты снаружи"
     else
         info "UFW: открыты порты 22 (SSH) и 443 (VLESS)"
     fi
@@ -201,7 +205,41 @@ elif command -v ntpd &>/dev/null; then
 fi
 info "Время: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
-# ── 9. Запуск XRay ───────────────────────────
+# ── 9. Настройка nginx SNI-роутера (CDN) ─────
+
+if [[ "$CDN_ENABLED" == true ]]; then
+    info "Настраиваю nginx SNI-роутер..."
+
+    # Удаляем дефолтный сайт
+    rm -f /etc/nginx/sites-enabled/default
+
+    # Добавляем include stream.d в nginx.conf (вне http-блока), если ещё не добавлен
+    if ! grep -q 'stream.d' /etc/nginx/nginx.conf; then
+        echo 'include /etc/nginx/stream.d/*.conf;' >> /etc/nginx/nginx.conf
+    fi
+
+    mkdir -p /etc/nginx/stream.d
+    cat > /etc/nginx/stream.d/vpn-sni.conf <<NGINX_EOF
+stream {
+    map \$ssl_preread_server_name \$backend {
+        ${CDN_DOMAIN}  127.0.0.1:2053;
+        default        127.0.0.1:9443;
+    }
+    server {
+        listen 443;
+        proxy_pass \$backend;
+        ssl_preread on;
+        proxy_connect_timeout 5s;
+        proxy_timeout 600s;
+    }
+}
+NGINX_EOF
+
+    nginx -t 2>/dev/null || error "Ошибка в конфиге nginx. Проверьте: nginx -t"
+    info "Конфиг nginx создан"
+fi
+
+# ── 10. Запуск XRay ──────────────────────────
 
 info "Запускаю XRay..."
 systemctl daemon-reload
@@ -215,12 +253,24 @@ else
     error "XRay не запустился. Проверьте: journalctl -u xray -n 20"
 fi
 
+if [[ "$CDN_ENABLED" == true ]]; then
+    info "Запускаю nginx..."
+    systemctl enable nginx > /dev/null 2>&1
+    systemctl restart nginx
+    sleep 1
+    if systemctl is-active --quiet nginx; then
+        info "nginx запущен и работает"
+    else
+        error "nginx не запустился. Проверьте: journalctl -u nginx -n 20"
+    fi
+fi
+
 # ── 10. Генерация ссылки и QR ─────────────────
 
 VLESS_LINK="vless://${CLIENT_UUID}@${SERVER_IP}:${PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${SNI_HOST}&fp=chrome&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&type=tcp#MyVPN"
 
 if [[ "$CDN_ENABLED" == true ]]; then
-    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:2053?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=grpc&serviceName=cdn&fp=chrome#MyVPN-CDN"
+    CDN_LINK="vless://${CLIENT_UUID}@${CDN_DOMAIN}:443?encryption=none&security=tls&sni=${CDN_DOMAIN}&type=grpc&serviceName=cdn&fp=chrome#MyVPN-CDN"
 fi
 
 echo ""
@@ -281,7 +331,7 @@ if [[ "$CDN_ENABLED" == true ]]; then
 
 ── CDN-режим (Cloudflare) ──
 Домен:        ${CDN_DOMAIN}
-Порт CDN:     2053 (origin, gRPC+TLS) → 2053 (Cloudflare)
+Порт CDN:     443 (nginx SNI-роутер → XRay gRPC:2053)
 
 CDN-ссылка:
 ${CDN_LINK}
